@@ -26,10 +26,12 @@ jobs:
           sudo apt-get install -y clang llvm libbpf-dev linux-libc-dev gcc-multilib
 
       - name: Build eBPF Sensor
-        run: make sensor          # go mod tidy -> go generate (bpf2go) -> go build
+        run: make sensor
 
       - name: Run Full Attack Simulation (Tier A, expects 12/12)
-        run: ./test/attack_simulation.sh
+        run: |
+          chmod +x test/attack_simulation.sh
+          ./test/attack_simulation.sh
 
       - name: eBPF Tier B as root
         run: |
