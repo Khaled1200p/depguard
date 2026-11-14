@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // SPDX-License-Identifier: GPL-2.0
 // DepGuard Tier-B kernel probe. Build via `go generate` (bpf2go, clang, libbpf-dev).
 //
