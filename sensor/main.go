@@ -5,7 +5,7 @@
 // SIGCONT on success and SIGKILL on violation.
 package main
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall -Werror" bpf openat.bpf.c --
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -target bpfel -cflags "-O2 -g -Wall" bpf openat.bpf.c --
 
 import (
 	"container/list"
@@ -61,6 +61,14 @@ type alert struct {
 	Version   string  `json:"version,omitempty"`
 	Expected  *string `json:"expected_sha256"`
 	Actual    *string `json:"actual_sha256"`
+}
+
+// dgConfig mirrors struct dg_config in openat.bpf.c (8 bytes, no implicit padding).
+type dgConfig struct {
+	WatchAll uint8
+	Enforce  uint8
+	Pad      uint16
+	SelfTgid uint32
 }
 
 type verRec struct{ version, file string }
@@ -124,15 +132,10 @@ func main() {
 	}
 
 	check(rlimit.RemoveMemlock())
-	spec, err := loadBpf()
-	check(err)
-	setVar := func(name string, v any) { check(spec.Variables[name].Set(v)) }
-	setVar("watch_all", boolU8(*all))
-	setVar("enforce", boolU8(a.enforce))
-	setVar("self_tgid", uint32(os.Getpid()))
 	var objs bpfObjects
-	check(spec.LoadAndAssign(&objs, nil))
+	check(loadBpfObjects(&objs, nil))
 	defer objs.Close()
+	check(objs.ConfigMap.Put(uint32(0), dgConfig{WatchAll: boolU8(*all), Enforce: boolU8(a.enforce), SelfTgid: uint32(os.Getpid())}))
 
 	for _, s := range splitList(*pids) {
 		n, err := strconv.ParseUint(s, 10, 32)

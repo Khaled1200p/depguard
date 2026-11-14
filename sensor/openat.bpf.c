@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 // SPDX-License-Identifier: GPL-2.0
 // DepGuard Tier-B kernel probe. Build via `go generate` (bpf2go, clang, libbpf-dev).
@@ -38,9 +37,20 @@ struct fork_ctx {
 	__s32 child_pid;
 };
 
-const volatile __u8 watch_all = 0;
-const volatile __u8 enforce = 0;
-const volatile __u32 self_tgid = 0;
+// Runtime config lives in a map (not .rodata) so the loader works on every cilium/ebpf version.
+struct dg_config {
+	__u8 watch_all;
+	__u8 enforce;
+	__u16 pad;
+	__u32 self_tgid;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, __u32);
+	__type(value, struct dg_config);
+} config_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -119,18 +129,22 @@ static __always_inline int is_code(const char *b, long len)
 
 static __always_inline int handle_open(__s32 dfd, const char *fname)
 {
+	__u32 zero = 0;
+	struct dg_config *cfg = bpf_map_lookup_elem(&config_map, &zero);
+	if (!cfg)
+		return 0;
+
 	__u64 pt = bpf_get_current_pid_tgid();
 	__u32 tgid = pt >> 32;
 
-	if (tgid == self_tgid)
+	if (tgid == cfg->self_tgid)
 		return 0;
-	if (!watch_all && !bpf_map_lookup_elem(&target_pids, &tgid)) {
+	if (!cfg->watch_all && !bpf_map_lookup_elem(&target_pids, &tgid)) {
 		__u64 cg = bpf_get_current_cgroup_id();
 		if (!bpf_map_lookup_elem(&target_cgroups, &cg))
 			return 0;
 	}
 
-	__u32 zero = 0;
 	char *buf = bpf_map_lookup_elem(&scratch, &zero);
 	if (!buf)
 		return 0;
@@ -155,7 +169,7 @@ static __always_inline int handle_open(__s32 dfd, const char *fname)
 	// Queue the stop BEFORE publishing the event so a fast SIGCONT can never
 	// overtake it. The signal is delivered on return to user mode: the process
 	// halts before it can read()/mmap() the file it just opened.
-	if (enforce)
+	if (cfg->enforce)
 		bpf_send_signal(SIGSTOP);
 	bpf_ringbuf_submit(e, 0);
 	return 0;
