@@ -10,6 +10,7 @@
 // resumes it (SIGCONT) after the hash check passes or kills it (SIGKILL) if not.
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
+#include <stdbool.h>
 
 #define PATH_MAX 4096
 #define SIGSTOP 19
