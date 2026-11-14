@@ -1,48 +1,37 @@
-name: Build and Full Attack Simulation
-
+name: CI
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  push: { branches: [main] }
+  pull_request:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install eBPF & Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make gcc gcc-multilib
+          cache: false
 
       - name: Build Go Baseline Generator
         run: |
-          go get ://github.com
           go mod tidy
+          go vet ./...
           make gen
 
-      - name: Build eBPF Sensor
+      - name: Install eBPF toolchain
         run: |
-          make sensor
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev linux-libc-dev
 
-      - name: Run Full Attack Simulation (12/12 + eBPF Root)
+      - name: Build eBPF Sensor
+        run: make sensor          # go mod tidy -> go generate (bpf2go) -> go build
+
+      - name: Run Full Attack Simulation (Tier A, expects 12/12)
+        run: ./test/attack_simulation.sh
+
+      - name: eBPF Tier B as root
         run: |
-          chmod +x test/attack_simulation.sh
-          sudo ./test/attack_simulation.sh
+          sudo -E env "PATH=$PATH" DEPGUARD_GEN="$PWD/bin/depguard-gen" \
+            ./test/attack_simulation.sh
