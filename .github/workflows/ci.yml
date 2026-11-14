@@ -1,0 +1,47 @@
+name: Build and Full Attack Simulation
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install eBPF & Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make gcc
+
+      - name: Build Go Baseline Generator
+        run: |
+          go mod tidy
+          make gen
+
+      - name: Build eBPF Sensor
+        run: |
+          make sensor
+
+      - name: Run Full Attack Simulation (12/12 + eBPF Root)
+        run: |
+          chmod +x test/attack_simulation.sh
+          sudo ./test/attack_simulation.sh
