@@ -30,7 +30,7 @@ jobs:
       - name: Install eBPF & Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make gcc
+          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make gcc gcc-multilib
 
       - name: Build Go Baseline Generator
         run: |
