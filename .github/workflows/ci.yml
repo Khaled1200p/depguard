@@ -23,7 +23,7 @@ jobs:
       - name: Install eBPF toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm libbpf-dev linux-libc-dev
+          sudo apt-get install -y clang llvm libbpf-dev linux-libc-dev gcc-multilib
 
       - name: Build eBPF Sensor
         run: make sensor          # go mod tidy -> go generate (bpf2go) -> go build
