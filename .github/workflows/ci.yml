@@ -34,6 +34,7 @@ jobs:
 
       - name: Build Go Baseline Generator
         run: |
+          go get ://github.com
           go mod tidy
           make gen
 
